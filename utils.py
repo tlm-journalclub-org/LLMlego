@@ -193,9 +193,9 @@ class EmbeddingOlympics:
         Semantic Distance: guess the cosine similarity between two sentences.
         Points based on how close the guess is to the actual similarity.
         """
-        from sentence_transformers import util
         emb = sentence_model.encode([sent1, sent2])
-        actual = float(util.cos_sim(emb[0], emb[1]))
+        v1, v2 = emb[0].flatten(), emb[1].flatten()
+        actual = float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
         error = abs(actual - guess)
         points = max(0, (1 - error * 5)) * 10  # 0 error = 10pts, 0.2 error = 0pts
         print(f"\n  S1: \"{sent1}\"")
