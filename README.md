@@ -13,13 +13,6 @@ python download_models.py
 
 Il secondo comando scarica i modelli (~1.1GB totali). Eseguilo **prima del lab** per evitare attese.
 
-## Notebook
-
-| # | Notebook | Argomento |
-|---|----------|-----------|
-| 1 | `01_king_minus_man_plus_woman` | Tokenizzazione, word embeddings (GloVe), aritmetica vettoriale, contextual embeddings (DistilBERT), bias, geometria |
-| 2 | `02_embedding_olympics` | Sentence embeddings, t-SNE, mini-RAG, Embedding Olympics (sfida a squadre) |
-
 ## Modelli usati
 
 | Modello | Uso | Peso |
