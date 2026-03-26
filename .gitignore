@@ -1,7 +1,8 @@
 CONTEXT.md
-*.ipynb
 sentence-model/
 distilbert-multilingual-cased/
 .claude
 *.kv
 *.kv.vectors.npy
+proposta_scuole_superiori.docx
+03_attention.ipynb
