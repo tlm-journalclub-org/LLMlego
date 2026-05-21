@@ -6,3 +6,5 @@ distilbert-multilingual-cased/
 *.kv.vectors.npy
 proposta_scuole_superiori.docx
 03_attention.ipynb
+__pycache__/
+*.pyc
