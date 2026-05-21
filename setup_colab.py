@@ -78,23 +78,13 @@ def warmup_tiktoken():
     _print("OK.")
 
 
-def abilita_widget_colab():
-    """In Colab serve abilitare i custom widget manager."""
-    try:
-        from google.colab import output  # type: ignore
-        output.enable_custom_widget_manager()
-        _print("Widget Colab abilitati.")
-    except ImportError:
-        # non siamo in Colab, niente da fare
-        pass
-
-
 def main():
     installa_pip()
     scarica_glove()
     warmup_tiktoken()
-    abilita_widget_colab()
     _print("Setup completato.")
+    # Nota: l'abilitazione dei custom widget di Colab va fatta dalla cella
+    # del notebook (richiede IPython attivo), non da qui che gira come subprocess.
 
 
 if __name__ == "__main__":
