@@ -10,7 +10,10 @@ from .embeddings import (
     widget_vicini,
 )
 from .geometria2d import plotta_2d
-from .golf import WordGolf, mostra_parole_operatore, classifica, PAROLE_OPERATORE
+from .golf import (
+    WordGolf, mostra_parole_operatore, classifica, PAROLE_OPERATORE,
+    test_dashboard, errori_dashboard,
+)
 from .bias import mostra_bias_professioni
 
 __all__ = [
@@ -26,5 +29,7 @@ __all__ = [
     "mostra_parole_operatore",
     "classifica",
     "PAROLE_OPERATORE",
+    "test_dashboard",
+    "errori_dashboard",
     "mostra_bias_professioni",
 ]

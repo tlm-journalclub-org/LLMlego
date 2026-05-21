@@ -8,11 +8,129 @@ Regole:
 - Vince quando il `target` compare nei top-5 vicini del vettore corrente.
 """
 from typing import Optional, List, Dict, Tuple
+import json
+import os
+import threading
+import time
+import urllib.request
+import urllib.error
+
 import numpy as np
 from IPython.display import HTML, display
 import plotly.graph_objects as go
 
 from .embeddings import _ensure_loaded, vettore, parola_piu_vicina
+
+
+# URL della dashboard condivisa (Apps Script Web App). Se None o vuoto,
+# la classifica resta puramente locale al notebook. Si puo' settare:
+#   - via variabile globale del modulo:  llmlego_scuola.golf.DASHBOARD_URL = "..."
+#   - oppure via env var:                os.environ["WORDGOLF_DASHBOARD_URL"] = "..."
+DASHBOARD_URL: Optional[str] = None
+
+# Buffer per gli errori delle POST asincrone (vuoto se tutto OK).
+# Si puo' ispezionare con `llmlego_scuola.golf.errori_dashboard()`.
+_DASHBOARD_ERRORS: List[str] = []
+
+
+def _get_dashboard_url() -> Optional[str]:
+    url = DASHBOARD_URL or os.environ.get("WORDGOLF_DASHBOARD_URL", "")
+    return url.strip() or None
+
+
+def _do_post(url: str, payload: dict, timeout: int = 10):
+    """Esegue il POST e ritorna (status, final_url, body_text). Solleva eccezioni."""
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.status, resp.url, resp.read().decode("utf-8", errors="replace")
+
+
+def _post_record_async(payload: dict):
+    """POST asincrono a DASHBOARD_URL. Non blocca il notebook.
+    Eventuali errori vengono accumulati in _DASHBOARD_ERRORS."""
+    url = _get_dashboard_url()
+    if not url:
+        return
+
+    def _runner():
+        try:
+            status, final_url, body = _do_post(url, payload, timeout=8)
+            # Apps Script risponde sempre 200 anche su errore applicativo,
+            # quindi controlliamo il body
+            if '"ok":true' not in body:
+                _DASHBOARD_ERRORS.append(
+                    f"HTTP {status} body inatteso: {body[:200]}"
+                )
+        except Exception as e:
+            _DASHBOARD_ERRORS.append(f"{type(e).__name__}: {e}")
+
+    threading.Thread(target=_runner, daemon=True).start()
+
+
+def errori_dashboard():
+    """Stampa gli eventuali errori di POST verso la dashboard.
+    Utile se 'vinto' e' apparso nel notebook ma il record non e' nel Sheet."""
+    if not _DASHBOARD_ERRORS:
+        print("Nessun errore registrato.")
+        return
+    print(f"{len(_DASHBOARD_ERRORS)} errori:")
+    for i, e in enumerate(_DASHBOARD_ERRORS, 1):
+        print(f"  {i}. {e}")
+
+
+def test_dashboard(squadra: str = "test-diag"):
+    """Diagnostica sincrona: prova a postare un record di test e stampa cosa
+    risponde il server. Usalo per capire se la URL e la configurazione del
+    Web App di Apps Script sono corrette."""
+    url = _get_dashboard_url()
+    print("=" * 60)
+    print(f"URL dashboard: {url!r}")
+    if not url:
+        print("❌ DASHBOARD_URL non impostato.")
+        print("   Setta: llmlego_scuola.golf.DASHBOARD_URL = 'https://...'")
+        return
+
+    payload = {
+        "squadra": squadra,
+        "start": "test",
+        "target": "test",
+        "mosse": 0,
+        "timestamp": int(time.time() * 1000),
+        "dettaglio": ["test diagnostico"],
+    }
+    print(f"Payload: {json.dumps(payload)}")
+    print("-" * 60)
+
+    try:
+        status, final_url, body = _do_post(url, payload, timeout=15)
+        print(f"HTTP status: {status}")
+        if final_url != url:
+            print(f"(redirect finale a: {final_url})")
+        print(f"Body: {body[:500]}")
+        if '"ok":true' in body:
+            print("\n✅ POST riuscito. Controlla il Google Sheet:")
+            print("   dovresti vedere una nuova riga col timestamp di adesso.")
+            print(f"   squadra: '{squadra}'")
+        else:
+            print("\n⚠️  Il server ha risposto, ma il body non contiene 'ok:true'.")
+            print("   Probabilmente il deploy ha problemi o l'URL non e' la Web App.")
+    except urllib.error.HTTPError as e:
+        print(f"❌ HTTPError {e.code}: {e.reason}")
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")
+            print(f"Body: {err_body[:500]}")
+        except Exception:
+            pass
+        if e.code in (401, 403):
+            print("\n   Il deploy probabilmente NON ha 'Who has access: Anyone'.")
+            print("   Vai su Deploy -> Manage deployments -> edit -> setta Anyone.")
+    except Exception as e:
+        print(f"❌ {type(e).__name__}: {e}")
 
 
 # Le 57 parole-operatore validate. Coprono: genere, dimensione, animali/natura,
@@ -227,16 +345,28 @@ class WordGolf:
         # Check vittoria
         if self.target in top_words:
             self.vinto = True
-            _RECORD.append({
+            record = {
                 "squadra": self.squadra,
                 "start": self.start,
                 "target": self.target,
                 "mosse": len(self.mosse),
                 "ultimo_topk": top_words,
-            })
+                "timestamp": int(time.time() * 1000),
+                "dettaglio": [
+                    f"{s}{op}->{r}" for s, op, r in self.mosse
+                ],
+            }
+            _RECORD.append(record)
+            # Manda alla dashboard condivisa (asincrono, non blocca)
+            _post_record_async(record)
+            badge_dash = (
+                ' <span style="background:#2c662d;color:white;padding:2px 8px;'
+                'border-radius:10px;font-size:11px;">→ dashboard</span>'
+                if _get_dashboard_url() else ""
+            )
             self._html_msg(
                 f"🎉 <b>VINTO!</b> '{self.target}' è nei top-{_TOP_K_VITTORIA} "
-                f"vicini di <code>{precedente} {segno} {parola}</code>.<br>"
+                f"vicini di <code>{precedente} {segno} {parola}</code>.{badge_dash}<br>"
                 f"Top-{_TOP_K_VITTORIA}: {', '.join(top_words)}<br>"
                 f"<b>Mosse totali: {len(self.mosse)}</b>",
                 colore="#2c662d",
