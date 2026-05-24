@@ -8,3 +8,6 @@ proposta_scuole_superiori.docx
 03_attention.ipynb
 __pycache__/
 *.pyc
+build_notebook.py
+.gitignore
+.DS_Store
