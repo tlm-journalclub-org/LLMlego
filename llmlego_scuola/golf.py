@@ -72,6 +72,16 @@ def _post_record_async(payload: dict):
     threading.Thread(target=_runner, daemon=True).start()
 
 
+def _post_event_async(event_type: str, base_payload: dict):
+    """Helper: POST un evento di tipo `event_type` (start | win) alla dashboard.
+    Apps Script fa dedup: per ogni (squadra, start, target, type) tiene solo
+    il PRIMO evento. Cosi' anche se gli studenti rieseguono la cella per
+    'barare' col tempo, il loro start_time ufficiale resta quello iniziale."""
+    payload = dict(base_payload)
+    payload["type"] = event_type
+    _post_record_async(payload)
+
+
 def errori_dashboard():
     """Stampa gli eventuali errori di POST verso la dashboard.
     Utile se 'vinto' e' apparso nel notebook ma il record non e' nel Sheet."""
@@ -152,7 +162,7 @@ PAROLE_OPERATORE = [
     "summer", "winter", "day", "night",
     # astratti
     "love", "war", "peace", "fear", "life", "death",
-    "power", "knowledge", "music", "age",
+    "power", "knowledge", "music", "age", "math", "movement",
 ]
 
 # Categorie per la visualizzazione (mostra_parole_operatore)
@@ -173,7 +183,7 @@ _CATEGORIE = {
     "tempo": ["summer", "winter", "day", "night"],
     "astratti": [
         "love", "war", "peace", "fear", "life", "death",
-        "power", "knowledge", "music", "age",
+        "power", "knowledge", "music", "age", "math", "movement",
     ],
 }
 
@@ -214,11 +224,23 @@ def mostra_parole_operatore():
 class WordGolf:
     """Una partita di Word Golf."""
 
-    def __init__(self, start: str, target: str, squadra: Optional[str] = None):
+    def __init__(
+        self,
+        start: str,
+        target: Optional[str] = None,
+        squadra: Optional[str] = None,
+    ):
+        """
+        - Con `target` impostato: partita classica, vincita quando il target
+          entra nei top-5.
+        - Senza `target` (None): modalità **esplorazione libera**. Niente
+          obiettivo, niente classifica: gli studenti sommano/sottraggono
+          parole per vedere dove finiscono nello spazio vettoriale.
+        """
         _ensure_loaded()
         try:
             self._start_v = vettore(start)
-            self._target_v = vettore(target)
+            self._target_v = vettore(target) if target is not None else None
         except KeyError as e:
             raise KeyError(f"Parola non in vocabolario: {e}") from e
 
@@ -235,6 +257,19 @@ class WordGolf:
         # Ogni mossa: (segno, operatore, risultato, top5)
         self.mosse: List[Tuple[str, str, str, List[str]]] = []
         self.vinto = False
+        # Tempo di inizio della partita: lo manderemo come evento "start"
+        # alla dashboard. La dashboard ha dedup per (squadra, round) quindi
+        # eseguire piu' volte la cella NON resetta il tempo ufficiale.
+        self._start_ts = int(time.time() * 1000)
+
+        # POST "start" event (solo modalita' sfida)
+        if self.target is not None:
+            _post_event_async("start", {
+                "squadra": self.squadra,
+                "start": self.start,
+                "target": self.target,
+                "timestamp": self._start_ts,
+            })
 
         self._intro()
 
@@ -253,17 +288,31 @@ class WordGolf:
         self._stampa_stato()
 
     def visualizza_percorso(self):
-        """Plot 2D del percorso: parole visitate + target, ridotte in 2D via PCA."""
+        """Plot 2D del percorso: parole visitate (e target se c'e'), ridotte
+        in 2D via PCA."""
         from sklearn.decomposition import PCA
         parole_path = [self.start] + [mossa[2] for mossa in self.mosse]
-        # Aggiungiamo il target per averlo nello stesso piano PCA
-        tutte = parole_path + [self.target]
+        if self.target is not None:
+            tutte = parole_path + [self.target]
+        else:
+            tutte = parole_path
+        if len(tutte) < 2:
+            display(HTML(
+                '<div style="color:#888;font-family:sans-serif;">'
+                'Almeno una mossa serve per disegnare il percorso.'
+                '</div>'
+            ))
+            return
         vecs = np.array([vettore(p) for p in tutte])
         pca = PCA(n_components=2).fit(vecs)
         coords = pca.transform(vecs)
 
-        path_xy = coords[:-1]
-        target_xy = coords[-1]
+        if self.target is not None:
+            path_xy = coords[:-1]
+            target_xy = coords[-1]
+        else:
+            path_xy = coords
+            target_xy = None
 
         fig = go.Figure()
         # Path
@@ -276,15 +325,16 @@ class WordGolf:
             marker=dict(size=10, color="#3498db"),
             name="il tuo cammino",
         ))
-        # Target
-        fig.add_trace(go.Scatter(
-            x=[target_xy[0]], y=[target_xy[1]],
-            mode="markers+text",
-            text=[f"🎯 {self.target}"],
-            textposition="top center",
-            marker=dict(size=18, color="#d62728", symbol="star"),
-            name="target",
-        ))
+        # Target (se presente)
+        if target_xy is not None:
+            fig.add_trace(go.Scatter(
+                x=[target_xy[0]], y=[target_xy[1]],
+                mode="markers+text",
+                text=[f"🎯 {self.target}"],
+                textposition="top center",
+                marker=dict(size=18, color="#d62728", symbol="star"),
+                name="target",
+            ))
         # Frecce tra step consecutivi
         for i in range(len(parole_path) - 1):
             fig.add_annotation(
@@ -294,8 +344,18 @@ class WordGolf:
                 showarrow=True, arrowhead=2, arrowsize=1.4,
                 arrowcolor="#3498db",
             )
+        if self.target is not None:
+            titolo = (
+                f"{self.squadra}: {self.start} → {self.target} "
+                f"({len(self.mosse)} mosse)"
+            )
+        else:
+            titolo = (
+                f"Esplorazione libera da {self.start} "
+                f"({len(self.mosse)} mosse)"
+            )
         fig.update_layout(
-            title=f"{self.squadra}: {self.start} → {self.target} ({len(self.mosse)} mosse)",
+            title=titolo,
             template="plotly_white",
             width=750, height=550,
             xaxis=dict(title="PCA 1"),
@@ -312,6 +372,24 @@ class WordGolf:
                 "<code>WordGolf(...)</code>.", colore="#888"
             )
             return
+        # Vietato usare start o target come operatore: sarebbe banale.
+        if parola == self.start:
+            self._html_msg(
+                f"❌ Non puoi usare la parola di <b>partenza</b> "
+                f"(<code>{self.start}</code>) come operatore: "
+                f"sarebbe una mossa banale. Mossa annullata.",
+                colore="#c00",
+            )
+            return
+        if self.target is not None and parola == self.target:
+            self._html_msg(
+                f"❌ Non puoi usare la parola <b>target</b> "
+                f"(<code>{self.target}</code>) come operatore: "
+                f"sarebbe come barare. Mossa annullata.",
+                colore="#c00",
+            )
+            return
+
         if parola not in PAROLE_OPERATORE:
             # Warning ma proseguiamo: la parola va comunque cercata in
             # GloVe; se non esiste nel vocabolario fermiamo li' con un
@@ -361,23 +439,26 @@ class WordGolf:
         precedente = self.parola_corrente
         self.parola_corrente = nuova_parola
 
-        # Check vittoria
-        if self.target in top_words:
+        # Check vittoria (solo se c'e' un target — modalita' sfida)
+        if self.target is not None and self.target in top_words:
             self.vinto = True
+            win_ts = int(time.time() * 1000)
             record = {
                 "squadra": self.squadra,
                 "start": self.start,
                 "target": self.target,
                 "mosse": len(self.mosse),
                 "ultimo_topk": top_words,
-                "timestamp": int(time.time() * 1000),
+                "timestamp": win_ts,
                 "dettaglio": [
                     f"{s}{op}->{r}" for s, op, r, _ in self.mosse
                 ],
             }
             _RECORD.append(record)
-            # Manda alla dashboard condivisa (asincrono, non blocca)
-            _post_record_async(record)
+            # Manda alla dashboard condivisa come evento "win".
+            # Apps Script fa dedup: solo la prima vittoria di una squadra
+            # per round viene conservata.
+            _post_event_async("win", record)
             badge_dash = (
                 ' <span style="background:#2c662d;color:white;padding:2px 8px;'
                 'border-radius:10px;font-size:11px;">→ dashboard</span>'
@@ -392,34 +473,54 @@ class WordGolf:
                 sfondo="#dff0d8",
             )
         else:
-            # mossa normale: mostra dove si è atterrati e quanto manca
-            sim_target = float(np.dot(
-                vettore(nuova_parola) / (np.linalg.norm(vettore(nuova_parola)) + 1e-9),
-                self._target_v / np.linalg.norm(self._target_v),
-            ))
-            self._html_msg(
-                f"Mossa {len(self.mosse)}: <code>{precedente} {segno} {parola}</code> → "
+            # mossa normale: mostra dove si è atterrati
+            base_msg = (
+                f"Mossa {len(self.mosse)}: "
+                f"<code>{precedente} {segno} {parola}</code> → "
                 f"<b>{nuova_parola}</b><br>"
-                f"<small>Top-5 vicini: {', '.join(top_words)}</small><br>"
-                f"<small>Distanza dal target (cosine sim): {sim_target:.3f} "
-                f"— più alta = più vicino</small>"
+                f"<small>Top-5 vicini: {', '.join(top_words)}</small>"
             )
+            if self._target_v is not None:
+                # In modalita' sfida aggiungiamo la distanza dal target
+                sim_target = float(np.dot(
+                    vettore(nuova_parola) / (
+                        np.linalg.norm(vettore(nuova_parola)) + 1e-9
+                    ),
+                    self._target_v / np.linalg.norm(self._target_v),
+                ))
+                base_msg += (
+                    f"<br><small>Distanza dal target (cosine sim): "
+                    f"{sim_target:.3f} — più alta = più vicino</small>"
+                )
+            self._html_msg(base_msg)
 
     def _intro(self):
-        self._html_msg(
-            f"🏁 Nuova partita: <b>{self.start} → {self.target}</b><br>"
-            f"Squadra: <i>{self.squadra}</i><br>"
-            f"Usa <code>g.aggiungi('parola')</code> o <code>g.sottrai('parola')</code>."
-        )
+        if self.target is None:
+            self._html_msg(
+                f"🧪 <b>Esplorazione libera</b> partendo da "
+                f"<code>{self.start}</code>.<br>"
+                f"Nessun obiettivo, niente classifica: somma e sottrai "
+                f"parole per vedere dove finisci nello spazio vettoriale.<br>"
+                f"Usa <code>g.aggiungi('parola')</code> o "
+                f"<code>g.sottrai('parola')</code>."
+            )
+        else:
+            self._html_msg(
+                f"🏁 Nuova partita: <b>{self.start} → {self.target}</b><br>"
+                f"Squadra: <i>{self.squadra}</i><br>"
+                f"Usa <code>g.aggiungi('parola')</code> o "
+                f"<code>g.sottrai('parola')</code>."
+            )
 
     def _stampa_stato(self):
         righe = []
         cur = self.start
         for i, mossa in enumerate(self.mosse, 1):
             segno, op, ris, top5 = mossa
-            # Evidenzia il target se presente nei top-5
+            # Evidenzia il target se presente nei top-5 (solo modalita' sfida)
             top5_html = ", ".join(
-                f'<b style="color:#2c662d;">{w}</b>' if w == self.target else w
+                f'<b style="color:#2c662d;">{w}</b>'
+                if (self.target is not None and w == self.target) else w
                 for w in top5
             )
             righe.append(
@@ -447,17 +548,29 @@ class WordGolf:
             f'<tbody>{"".join(righe) or "<tr><td colspan=7><i>nessuna mossa ancora</i></td></tr>"}</tbody>'
             f'</table>'
         )
-        v_cur = vettore(self.parola_corrente)
-        sim_target = float(np.dot(
-            v_cur / (np.linalg.norm(v_cur) + 1e-9),
-            self._target_v / np.linalg.norm(self._target_v),
-        ))
+        if self._target_v is not None:
+            v_cur = vettore(self.parola_corrente)
+            sim_target = float(np.dot(
+                v_cur / (np.linalg.norm(v_cur) + 1e-9),
+                self._target_v / np.linalg.norm(self._target_v),
+            ))
+            header = (
+                f'<div><b>{self.squadra}</b> — '
+                f'{self.start} → 🎯 {self.target}</div>'
+                f'<div>Mosse fatte: {len(self.mosse)}. Parola attuale: '
+                f'<code>{self.parola_corrente}</code>. '
+                f'Sim. con target: {sim_target:.3f}</div>'
+            )
+        else:
+            header = (
+                f'<div>🧪 <b>Esplorazione libera</b> partita da '
+                f'<code>{self.start}</code></div>'
+                f'<div>Mosse fatte: {len(self.mosse)}. Parola attuale: '
+                f'<code>{self.parola_corrente}</code>.</div>'
+            )
         html = (
             f'<div style="font-family:sans-serif;">'
-            f'<div><b>{self.squadra}</b> — {self.start} → 🎯 {self.target}</div>'
-            f'<div>Mosse fatte: {len(self.mosse)}. Parola attuale: '
-            f'<code>{self.parola_corrente}</code>. '
-            f'Sim. con target: {sim_target:.3f}</div>'
+            f'{header}'
             f'<div style="margin-top:6px;">{tabella}</div>'
             f'</div>'
         )
