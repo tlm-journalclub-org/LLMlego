@@ -133,45 +133,48 @@ def test_dashboard(squadra: str = "test-diag"):
         print(f"❌ {type(e).__name__}: {e}")
 
 
-# Le 57 parole-operatore validate. Coprono: genere, dimensione, animali/natura,
-# paesi, cibo, tempo/meteo, astratto, azioni, tech.
+# ~50 parole-operatore semplici e narrative. Categorie evocative pensate
+# per studenti delle superiori (in inglese perche' GloVe e' in inglese).
 PAROLE_OPERATORE = [
-    # genere / persone
-    "man", "woman", "boy", "girl", "king", "queen",
-    # dimensione / fisicita'
-    "big", "small", "tall", "short",
-    # animali / natura
-    "bird", "fish", "dog", "horse", "tree", "flower",
-    "mountain", "sea", "river", "sky", "fire", "stone",
-    # paesi / luoghi
-    "italy", "france", "japan", "america", "city", "country", "rome", "paris",
+    # persone / ruoli
+    "man", "woman", "boy", "girl", "child", "baby",
+    "king", "queen", "soldier", "doctor", "farmer", "teacher", "student",
+    # luoghi
+    "italy", "france", "japan", "america", "paris", "tokyo",
+    "school", "hospital", "farm", "city", "mountain", "sea", "river",
     # cibo
-    "bread", "fruit", "meat", "water", "wine",
-    # tempo / meteo
-    "summer", "spring", "day", "night", "sun", "rain", "snow",
-    # astratto
-    "love", "fear", "music", "war", "peace",
-    "money", "power", "knowledge", "death", "life",
-    # azione / movimento
-    "run", "fly", "walk",
-    # tech
-    "computer", "machine",
+    "bread", "fish", "fruit", "meat", "water", "wine",
+    # oggetti
+    "book", "pen", "crown", "weapon", "money", "computer",
+    # natura / animali
+    "sun", "snow", "fire", "tree", "flower", "dog", "cat", "bird",
+    # tempo
+    "summer", "winter", "day", "night",
+    # astratti
+    "love", "war", "peace", "fear", "life", "death",
+    "power", "knowledge", "music", "age",
 ]
 
-# Categorie per la visualizzazione
+# Categorie per la visualizzazione (mostra_parole_operatore)
 _CATEGORIE = {
-    "👥 persone": ["man", "woman", "boy", "girl", "king", "queen"],
-    "📏 dimensione": ["big", "small", "tall", "short"],
-    "🐾 animali e natura": ["bird", "fish", "dog", "horse", "tree", "flower",
-                            "mountain", "sea", "river", "sky", "fire", "stone"],
-    "🌍 luoghi": ["italy", "france", "japan", "america", "city", "country",
-                  "rome", "paris"],
-    "🍞 cibo": ["bread", "fruit", "meat", "water", "wine"],
-    "🌤️ tempo": ["summer", "spring", "day", "night", "sun", "rain", "snow"],
-    "💭 astratto": ["love", "fear", "music", "war", "peace",
-                   "money", "power", "knowledge", "death", "life"],
-    "🏃 azione": ["run", "fly", "walk"],
-    "💻 tech": ["computer", "machine"],
+    "persone e ruoli": [
+        "man", "woman", "boy", "girl", "child", "baby",
+        "king", "queen", "soldier", "doctor", "farmer", "teacher", "student",
+    ],
+    "luoghi": [
+        "italy", "france", "japan", "america", "paris", "tokyo",
+        "school", "hospital", "farm", "city", "mountain", "sea", "river",
+    ],
+    "cibo": ["bread", "fish", "fruit", "meat", "water", "wine"],
+    "oggetti": ["book", "pen", "crown", "weapon", "money", "computer"],
+    "natura e animali": [
+        "sun", "snow", "fire", "tree", "flower", "dog", "cat", "bird",
+    ],
+    "tempo": ["summer", "winter", "day", "night"],
+    "astratti": [
+        "love", "war", "peace", "fear", "life", "death",
+        "power", "knowledge", "music", "age",
+    ],
 }
 
 # Quanti top-K considerare per dichiarare "vittoria"
@@ -229,7 +232,8 @@ class WordGolf:
         # ("sono qui, applico questa operazione, arrivo li'") e coerente
         # con il modo in cui interpretiamo l'aritmetica vettoriale nel Modulo 3.
         self.parola_corrente = start
-        self.mosse: List[Tuple[str, str, str]] = []  # (segno, op, risultato)
+        # Ogni mossa: (segno, operatore, risultato, top5)
+        self.mosse: List[Tuple[str, str, str, List[str]]] = []
         self.vinto = False
 
         self._intro()
@@ -251,7 +255,7 @@ class WordGolf:
     def visualizza_percorso(self):
         """Plot 2D del percorso: parole visitate + target, ridotte in 2D via PCA."""
         from sklearn.decomposition import PCA
-        parole_path = [self.start] + [m[2] for m in self.mosse]
+        parole_path = [self.start] + [mossa[2] for mossa in self.mosse]
         # Aggiungiamo il target per averlo nello stesso piano PCA
         tutte = parole_path + [self.target]
         vecs = np.array([vettore(p) for p in tutte])
@@ -309,16 +313,31 @@ class WordGolf:
             )
             return
         if parola not in PAROLE_OPERATORE:
+            # Warning ma proseguiamo: la parola va comunque cercata in
+            # GloVe; se non esiste nel vocabolario fermiamo li' con un
+            # messaggio chiaro.
             self._html_msg(
-                f"<b>'{parola}' non è una parola-operatore valida.</b><br>"
-                f"Usa <code>mostra_parole_operatore()</code> per vedere la lista.",
+                f"⚠️ <b>'{parola}'</b> non è tra le parole-operatore "
+                f"consigliate. Procedo comunque, ma se non è in GloVe "
+                f"la mossa fallirà. "
+                f"Usa <code>mostra_parole_operatore()</code> per "
+                f"vedere la lista consigliata.",
+                colore="#9a6300",
+                sfondo="#fff3cd",
+            )
+
+        # Snap-reset: ogni mossa parte dal vettore della parola corrente
+        try:
+            base_v = vettore(self.parola_corrente)
+            delta = vettore(parola)
+        except KeyError as e:
+            self._html_msg(
+                f"❌ La parola <code>{parola}</code> non è nel "
+                f"vocabolario di GloVe: la mossa è annullata. "
+                f"<small>{e}</small>",
                 colore="#c00",
             )
             return
-
-        # Snap-reset: ogni mossa parte dal vettore della parola corrente
-        base_v = vettore(self.parola_corrente)
-        delta = vettore(parola)
         if segno == "+":
             nuovo_v = base_v + delta
         else:
@@ -337,7 +356,7 @@ class WordGolf:
         top_words = [w for w, _ in topk]
 
         nuova_parola = top_words[0]
-        self.mosse.append((segno, parola, nuova_parola))
+        self.mosse.append((segno, parola, nuova_parola, list(top_words)))
         self._ultimo_v = nuovo_v  # per la riga di diagnostica "distanza dal target"
         precedente = self.parola_corrente
         self.parola_corrente = nuova_parola
@@ -353,7 +372,7 @@ class WordGolf:
                 "ultimo_topk": top_words,
                 "timestamp": int(time.time() * 1000),
                 "dettaglio": [
-                    f"{s}{op}->{r}" for s, op, r in self.mosse
+                    f"{s}{op}->{r}" for s, op, r, _ in self.mosse
                 ],
             }
             _RECORD.append(record)
@@ -396,14 +415,24 @@ class WordGolf:
     def _stampa_stato(self):
         righe = []
         cur = self.start
-        for i, (segno, op, ris) in enumerate(self.mosse, 1):
+        for i, mossa in enumerate(self.mosse, 1):
+            segno, op, ris, top5 = mossa
+            # Evidenzia il target se presente nei top-5
+            top5_html = ", ".join(
+                f'<b style="color:#2c662d;">{w}</b>' if w == self.target else w
+                for w in top5
+            )
             righe.append(
-                f'<tr><td style="padding:2px 8px;">{i}</td>'
+                f'<tr>'
+                f'<td style="padding:2px 8px;text-align:right;">{i}</td>'
                 f'<td style="padding:2px 8px;font-family:monospace;">{cur}</td>'
                 f'<td style="padding:2px 8px;text-align:center;">{segno}</td>'
                 f'<td style="padding:2px 8px;font-family:monospace;">{op}</td>'
                 f'<td style="padding:2px 8px;text-align:center;">→</td>'
-                f'<td style="padding:2px 8px;font-family:monospace;"><b>{ris}</b></td>'
+                f'<td style="padding:2px 8px;font-family:monospace;">'
+                f'<b>{ris}</b></td>'
+                f'<td style="padding:2px 8px;font-family:monospace;'
+                f'font-size:11px;color:#666;">top-5: {top5_html}</td>'
                 f'</tr>'
             )
             cur = ris
@@ -412,8 +441,10 @@ class WordGolf:
             f'<thead><tr style="border-bottom:1px solid #999;">'
             f'<th style="padding:2px 8px;">#</th>'
             f'<th style="padding:2px 8px;">da</th>'
-            f'<th></th><th>op</th><th></th><th>a</th></tr></thead>'
-            f'<tbody>{"".join(righe) or "<tr><td colspan=6><i>nessuna mossa ancora</i></td></tr>"}</tbody>'
+            f'<th></th><th>op</th><th></th><th>a</th>'
+            f'<th style="padding:2px 8px;text-align:left;">vicini</th>'
+            f'</tr></thead>'
+            f'<tbody>{"".join(righe) or "<tr><td colspan=7><i>nessuna mossa ancora</i></td></tr>"}</tbody>'
             f'</table>'
         )
         v_cur = vettore(self.parola_corrente)

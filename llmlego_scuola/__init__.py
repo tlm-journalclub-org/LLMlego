@@ -7,9 +7,10 @@ from .embeddings import (
     vettore,
     parola_piu_vicina,
     mostra_vettore,
+    mostra_vettore_2d,
     widget_vicini,
 )
-from .geometria2d import plotta_2d
+from .geometria2d import plotta_2d, mostra_similarita_2d, tabella_similarita_2d
 from .golf import (
     WordGolf, mostra_parole_operatore, classifica, PAROLE_OPERATORE,
     test_dashboard, errori_dashboard,
@@ -23,8 +24,11 @@ __all__ = [
     "vettore",
     "parola_piu_vicina",
     "mostra_vettore",
+    "mostra_vettore_2d",
     "widget_vicini",
     "plotta_2d",
+    "mostra_similarita_2d",
+    "tabella_similarita_2d",
     "WordGolf",
     "mostra_parole_operatore",
     "classifica",

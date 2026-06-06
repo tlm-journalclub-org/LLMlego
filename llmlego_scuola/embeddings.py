@@ -135,6 +135,55 @@ def parola_piu_vicina(
     return risultati
 
 
+def mostra_vettore_2d(parola: str, spazio: dict):
+    """Versione 2D di `mostra_vettore`: mostra i due valori del vettore
+    inventato a mano nello spazio 2D (componenti X e Y) come heatmap di 2
+    celle, con la stessa palette blu/rossa del caso 100D.
+
+    Esempio d'uso:
+        spazio = {"re": (0.9, -0.7), ...}
+        mostra_vettore_2d("re", spazio)
+    """
+    if parola not in spazio:
+        raise KeyError(
+            f"'{parola}' non e' nello spazio fornito. "
+            f"Disponibili: {list(spazio.keys())}"
+        )
+    v = spazio[parola]
+    celle = []
+    etichette = ["dim 1", "dim 2"]
+    for i, (val, et) in enumerate(zip(v, etichette)):
+        # Palette identica a mostra_vettore: blu (negativo) -> bianco -> rosso (positivo)
+        # In 2D sappiamo che val in [-1, +1] per costruzione, quindi span=1
+        t = float(val)
+        if t >= 0:
+            r = 255
+            g = int(255 * (1 - t))
+            b = int(255 * (1 - t))
+        else:
+            r = int(255 * (1 + t))
+            g = int(255 * (1 + t))
+            b = 255
+        celle.append(
+            f'<div style="display:inline-block;width:90px;height:60px;'
+            f'background:rgb({r},{g},{b});border:1px solid #ccc;'
+            f'margin-right:4px;text-align:center;line-height:60px;'
+            f'font-family:monospace;font-size:14px;color:#333;" '
+            f'title="{et}: {val:+.2f}">{et}: {val:+.2f}</div>'
+        )
+
+    html = (
+        f'<div style="font-family:sans-serif;">'
+        f'<div style="margin-bottom:6px;"><b>"{parola}"</b> nello spazio inventato — '
+        f'vettore a <b>2 dimensioni</b> (valori tra −1 e +1)</div>'
+        f'<div style="white-space:nowrap;">{"".join(celle)}</div>'
+        f'<div style="font-size:11px;color:#666;margin-top:6px;">'
+        f'Rosso = componente positiva, blu = negativa, intensità = grandezza.'
+        f'</div></div>'
+    )
+    display(HTML(html))
+
+
 def mostra_vettore(parola: str):
     """Mostra il vettore di una parola come heatmap orizzontale di 100 celle."""
     _ensure_loaded()
