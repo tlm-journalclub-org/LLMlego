@@ -7,6 +7,7 @@ API minimale pensata per la lezione:
 - `mostra_vettore(parola)`: heatmap visuale delle 100 componenti
 - `widget_vicini()`: campo di testo + lista vicini, in tempo reale
 """
+
 import os
 import numpy as np
 from typing import Optional, Union, List, Tuple
@@ -153,33 +154,34 @@ def mostra_vettore_2d(parola: str, spazio: dict):
     celle = []
     etichette = ["dim 1", "dim 2"]
     for i, (val, et) in enumerate(zip(v, etichette)):
-        # Palette identica a mostra_vettore: blu (negativo) -> bianco -> rosso (positivo)
+        # Palette identica a mostra_vettore: rosso (negativo) -> bianco -> blu (positivo)
         # In 2D sappiamo che val in [-1, +1] per costruzione, quindi span=1
         t = float(val)
         if t >= 0:
-            r = 255
+            # positivo → blu
+            r = int(255 * (1 - t))
             g = int(255 * (1 - t))
-            b = int(255 * (1 - t))
-        else:
-            r = int(255 * (1 + t))
-            g = int(255 * (1 + t))
             b = 255
+        else:
+            # negativo → rosso
+            r = 255
+            g = int(255 * (1 + t))
+            b = int(255 * (1 + t))
         celle.append(
             f'<div style="display:inline-block;width:90px;height:60px;'
-            f'background:rgb({r},{g},{b});border:1px solid #ccc;'
-            f'margin-right:4px;text-align:center;line-height:60px;'
+            f"background:rgb({r},{g},{b});border:1px solid #ccc;"
+            f"margin-right:4px;text-align:center;line-height:60px;"
             f'font-family:monospace;font-size:14px;color:#333;" '
             f'title="{et}: {val:+.2f}">{et}: {val:+.2f}</div>'
         )
 
     html = (
         f'<div style="font-family:sans-serif;">'
-        f'<div style="margin-bottom:6px;"><b>"{parola}"</b> nello spazio inventato — '
-        f'vettore a <b>2 dimensioni</b> (valori tra −1 e +1)</div>'
+        f'<div style="margin-bottom:6px;"><b>"{parola}"</b> nello spazio inventato come '
+        f"vettore a <b>2 dimensioni</b> (valori tra −1 e +1)</div>"
         f'<div style="white-space:nowrap;">{"".join(celle)}</div>'
         f'<div style="font-size:11px;color:#666;margin-top:6px;">'
-        f'Rosso = componente positiva, blu = negativa, intensità = grandezza.'
-        f'</div></div>'
+        f"</div></div>"
     )
     display(HTML(html))
 
@@ -196,32 +198,33 @@ def mostra_vettore(parola: str):
 
     celle = []
     for i, val in enumerate(v):
-        # Mappa val in [-1, 1] tramite span; poi a colore blu->bianco->rosso
+        # Mappa val in [-1, 1] tramite span; poi a colore rosso->bianco->blu
+        # Convenzione: blu = positivo, rosso = negativo (coerente con tabella_similarita_2d e bias)
         t = float(val) / span  # [-1, 1]
         if t >= 0:
-            r = 255
+            r = int(255 * (1 - t))
             g = int(255 * (1 - t))
-            b = int(255 * (1 - t))
-        else:
-            r = int(255 * (1 + t))
-            g = int(255 * (1 + t))
             b = 255
+        else:
+            r = 255
+            g = int(255 * (1 + t))
+            b = int(255 * (1 + t))
         celle.append(
             f'<div title="dim {i}: {val:+.3f}" '
             f'style="display:inline-block;width:14px;height:30px;'
-            f'background:rgb({r},{g},{b});border:1px solid #ddd;'
+            f"background:rgb({r},{g},{b});border:1px solid #ddd;"
             f'margin:0;"></div>'
         )
 
     html = (
         f'<div style="font-family:sans-serif;">'
-        f'<div style="margin-bottom:6px;"><b>"{parola}"</b> in GloVe — '
-        f'vettore a <b>100 dimensioni</b>, norma {norma:.2f}</div>'
+        f'<div style="margin-bottom:6px;"><b>"{parola}"</b> in GloVe come '
+        f"vettore a <b>100 dimensioni</b>, norma {norma:.2f}</div>"
         f'<div style="white-space:nowrap;line-height:0;">{"".join(celle)}</div>'
         f'<div style="font-size:11px;color:#666;margin-top:4px;">'
-        f'Rosso = componente positiva, blu = negativa. '
-        f'Passa il mouse sopra una cella per vedere il valore.'
-        f'</div></div>'
+        f"Blu = componente positiva, rosso = negativa. "
+        f"Passa il mouse sopra una cella per vedere il valore."
+        f"</div></div>"
     )
     display(HTML(html))
 
@@ -260,23 +263,23 @@ def widget_vicini(parola_iniziale: str = "king", topn: int = 10):
                 w_pct = max(0, min(100, int(s * 100)))
                 barra = (
                     f'<div style="display:inline-block;background:#3498db;'
-                    f'height:10px;width:{w_pct * 2}px;margin-right:8px;'
+                    f"height:10px;width:{w_pct * 2}px;margin-right:8px;"
                     f'vertical-align:middle;"></div>'
                 )
                 righe.append(
-                    f'<tr>'
+                    f"<tr>"
                     f'<td style="padding:2px 8px;font-family:monospace;">{w}</td>'
                     f'<td style="padding:2px 8px;font-family:monospace;text-align:right;">'
-                    f'{s:.3f}</td>'
-                    f'<td>{barra}</td>'
-                    f'</tr>'
+                    f"{s:.3f}</td>"
+                    f"<td>{barra}</td>"
+                    f"</tr>"
                 )
             html = (
                 f'<table style="border-collapse:collapse;font-size:13px;">'
                 f'<thead><tr style="border-bottom:1px solid #999;">'
                 f'<th style="padding:3px 8px;text-align:left;">vicino</th>'
                 f'<th style="padding:3px 8px;">cos. sim.</th>'
-                f'<th></th></tr></thead>'
+                f"<th></th></tr></thead>"
                 f'<tbody>{"".join(righe)}</tbody></table>'
             )
             display(HTML(html))

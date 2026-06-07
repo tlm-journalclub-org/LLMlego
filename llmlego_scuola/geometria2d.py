@@ -220,24 +220,44 @@ def tabella_similarita_2d(
 
     `coppie` è una lista di tuple (parola_a, parola_b).
     """
+    # Barre divergenti da un asse centrale (cos(θ) = 0): blu verso destra
+    # per valori positivi, rosse verso sinistra per valori negativi.
+    # Stessa convenzione usata nel grafico del bias di genere.
+    BAR_MAX = 120
     righe = []
     for a, b in coppie:
         if a not in spazio or b not in spazio:
             continue
         sim = _cosine_sim_2d(spazio[a], spazio[b])
-        # barra orizzontale proporzionale (sim può essere negativa)
-        pct = int(abs(sim) * 100)
-        colore = "#3498db" if sim >= 0 else "#e74c3c"
-        barra = (
-            f'<div style="display:inline-block;height:10px;width:{pct}px;'
-            f'background:{colore};vertical-align:middle;"></div>'
-        )
+        pct = int(abs(sim) * BAR_MAX)
+        if sim >= 0:
+            barra = (
+                f'<div style="position:relative;width:{2 * BAR_MAX + 2}px;'
+                f'height:14px;">'
+                f'<div style="position:absolute;left:{BAR_MAX}px;top:0;'
+                f'width:1px;height:14px;background:#888;"></div>'
+                f'<div style="position:absolute;left:{BAR_MAX + 1}px;top:2px;'
+                f'width:{pct}px;height:10px;background:#3498db;'
+                f'border-radius:0 2px 2px 0;"></div>'
+                f'</div>'
+            )
+        else:
+            barra = (
+                f'<div style="position:relative;width:{2 * BAR_MAX + 2}px;'
+                f'height:14px;">'
+                f'<div style="position:absolute;left:{BAR_MAX}px;top:0;'
+                f'width:1px;height:14px;background:#888;"></div>'
+                f'<div style="position:absolute;left:{BAR_MAX - pct}px;top:2px;'
+                f'width:{pct}px;height:10px;background:#e74c3c;'
+                f'border-radius:2px 0 0 2px;"></div>'
+                f'</div>'
+            )
         righe.append(
             f'<tr>'
             f'<td style="padding:3px 8px;font-family:monospace;">{a}</td>'
             f'<td style="padding:3px 8px;font-family:monospace;">{b}</td>'
-            f'<td style="padding:3px 8px;text-align:right;font-family:monospace;">'
-            f'{sim:+.3f}</td>'
+            f'<td style="padding:3px 8px;text-align:right;'
+            f'font-family:monospace;">{sim:+.3f}</td>'
             f'<td style="padding:3px 8px;">{barra}</td>'
             f'</tr>'
         )
@@ -248,7 +268,9 @@ def tabella_similarita_2d(
         f'<th style="padding:3px 8px;">parola A</th>'
         f'<th style="padding:3px 8px;">parola B</th>'
         f'<th style="padding:3px 8px;">cos(θ)</th>'
-        f'<th></th></tr></thead>'
+        f'<th style="padding:3px 8px;font-weight:normal;color:#666;'
+        f'font-size:11px;">−1  ←  0  →  +1</th>'
+        f'</tr></thead>'
         f'<tbody>{"".join(righe)}</tbody></table>'
         f'</div>'
     )

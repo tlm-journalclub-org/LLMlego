@@ -7,6 +7,7 @@ Regole:
   la parola attuale per evitare loop).
 - Vince quando il `target` compare nei top-5 vicini del vettore corrente.
 """
+
 from typing import Optional, List, Dict, Tuple
 import json
 import os
@@ -21,12 +22,13 @@ import plotly.graph_objects as go
 
 from .embeddings import _ensure_loaded, vettore, parola_piu_vicina
 
-
 # URL della dashboard condivisa (Apps Script Web App). Se None o vuoto,
 # la classifica resta puramente locale al notebook. Si puo' settare:
 #   - via variabile globale del modulo:  llmlego_scuola.golf.DASHBOARD_URL = "..."
 #   - oppure via env var:                os.environ["WORDGOLF_DASHBOARD_URL"] = "..."
-DASHBOARD_URL: Optional[str] = None
+DASHBOARD_URL: Optional[str] = (
+    "https://script.google.com/macros/s/AKfycbzhriH8EvQ7wUG7uUIew3_HL58uVr0VvoKmVNETs7DgHXZN3GOCgtLTG_VAOSfYM13lhw/exec"
+)
 
 # Buffer per gli errori delle POST asincrone (vuoto se tutto OK).
 # Si puo' ispezionare con `llmlego_scuola.golf.errori_dashboard()`.
@@ -42,7 +44,8 @@ def _do_post(url: str, payload: dict, timeout: int = 10):
     """Esegue il POST e ritorna (status, final_url, body_text). Solleva eccezioni."""
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url, data=data,
+        url,
+        data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
@@ -63,9 +66,7 @@ def _post_record_async(payload: dict):
             # Apps Script risponde sempre 200 anche su errore applicativo,
             # quindi controlliamo il body
             if '"ok":true' not in body:
-                _DASHBOARD_ERRORS.append(
-                    f"HTTP {status} body inatteso: {body[:200]}"
-                )
+                _DASHBOARD_ERRORS.append(f"HTTP {status} body inatteso: {body[:200]}")
         except Exception as e:
             _DASHBOARD_ERRORS.append(f"{type(e).__name__}: {e}")
 
@@ -147,43 +148,134 @@ def test_dashboard(squadra: str = "test-diag"):
 # per studenti delle superiori (in inglese perche' GloVe e' in inglese).
 PAROLE_OPERATORE = [
     # persone / ruoli
-    "man", "woman", "boy", "girl", "child", "baby",
-    "king", "queen", "soldier", "doctor", "farmer", "teacher", "student",
+    "man",
+    "woman",
+    "boy",
+    "girl",
+    "child",
+    "baby",
+    "king",
+    "queen",
+    "soldier",
+    "doctor",
+    "farmer",
+    "teacher",
+    "student",
     # luoghi
-    "italy", "france", "japan", "america", "paris", "tokyo",
-    "school", "hospital", "farm", "city", "mountain", "sea", "river",
+    "italy",
+    "france",
+    "japan",
+    "america",
+    "paris",
+    "tokyo",
+    "school",
+    "hospital",
+    "farm",
+    "city",
+    "mountain",
+    "sea",
+    "river",
     # cibo
-    "bread", "fish", "fruit", "meat", "water", "wine",
+    "bread",
+    "fish",
+    "fruit",
+    "meat",
+    "water",
+    "wine",
     # oggetti
-    "book", "pen", "crown", "weapon", "money", "computer",
+    "book",
+    "pen",
+    "crown",
+    "weapon",
+    "money",
+    "computer",
     # natura / animali
-    "sun", "snow", "fire", "tree", "flower", "dog", "cat", "bird",
+    "sun",
+    "snow",
+    "fire",
+    "tree",
+    "flower",
+    "dog",
+    "cat",
+    "bird",
     # tempo
-    "summer", "winter", "day", "night",
+    "summer",
+    "winter",
+    "day",
+    "night",
     # astratti
-    "love", "war", "peace", "fear", "life", "death",
-    "power", "knowledge", "music", "age", "math", "movement",
+    "love",
+    "war",
+    "peace",
+    "fear",
+    "life",
+    "death",
+    "power",
+    "knowledge",
+    "music",
+    "age",
+    "math",
+    "movement",
 ]
 
 # Categorie per la visualizzazione (mostra_parole_operatore)
 _CATEGORIE = {
     "persone e ruoli": [
-        "man", "woman", "boy", "girl", "child", "baby",
-        "king", "queen", "soldier", "doctor", "farmer", "teacher", "student",
+        "man",
+        "woman",
+        "boy",
+        "girl",
+        "child",
+        "baby",
+        "king",
+        "queen",
+        "soldier",
+        "doctor",
+        "farmer",
+        "teacher",
+        "student",
     ],
     "luoghi": [
-        "italy", "france", "japan", "america", "paris", "tokyo",
-        "school", "hospital", "farm", "city", "mountain", "sea", "river",
+        "italy",
+        "france",
+        "japan",
+        "america",
+        "paris",
+        "tokyo",
+        "school",
+        "hospital",
+        "farm",
+        "city",
+        "mountain",
+        "sea",
+        "river",
     ],
     "cibo": ["bread", "fish", "fruit", "meat", "water", "wine"],
     "oggetti": ["book", "pen", "crown", "weapon", "money", "computer"],
     "natura e animali": [
-        "sun", "snow", "fire", "tree", "flower", "dog", "cat", "bird",
+        "sun",
+        "snow",
+        "fire",
+        "tree",
+        "flower",
+        "dog",
+        "cat",
+        "bird",
     ],
     "tempo": ["summer", "winter", "day", "night"],
     "astratti": [
-        "love", "war", "peace", "fear", "life", "death",
-        "power", "knowledge", "music", "age", "math", "movement",
+        "love",
+        "war",
+        "peace",
+        "fear",
+        "life",
+        "death",
+        "power",
+        "knowledge",
+        "music",
+        "age",
+        "math",
+        "movement",
     ],
 }
 
@@ -202,21 +294,21 @@ def mostra_parole_operatore():
         for p in parole:
             chips.append(
                 f'<span style="display:inline-block;padding:3px 9px;'
-                f'background:#eef;border:1px solid #ccd;border-radius:12px;'
+                f"background:#eef;border:1px solid #ccd;border-radius:12px;"
                 f'margin:2px;font-family:monospace;font-size:12px;">{p}</span>'
             )
         sezioni.append(
             f'<div style="margin-bottom:6px;">'
             f'<span style="font-weight:600;font-size:13px;">{cat}</span><br>'
             f'{"".join(chips)}'
-            f'</div>'
+            f"</div>"
         )
     html = (
         f'<div style="font-family:sans-serif;">'
         f'<div style="margin-bottom:8px;"><b>{len(PAROLE_OPERATORE)} parole disponibili</b> '
-        f'come operatori (puoi aggiungerle o sottrarle ad ogni mossa).</div>'
+        f"come operatori (puoi aggiungerle o sottrarle ad ogni mossa).</div>"
         f'{"".join(sezioni)}'
-        f'</div>'
+        f"</div>"
     )
     display(HTML(html))
 
@@ -264,12 +356,15 @@ class WordGolf:
 
         # POST "start" event (solo modalita' sfida)
         if self.target is not None:
-            _post_event_async("start", {
-                "squadra": self.squadra,
-                "start": self.start,
-                "target": self.target,
-                "timestamp": self._start_ts,
-            })
+            _post_event_async(
+                "start",
+                {
+                    "squadra": self.squadra,
+                    "start": self.start,
+                    "target": self.target,
+                    "timestamp": self._start_ts,
+                },
+            )
 
         self._intro()
 
@@ -291,17 +386,20 @@ class WordGolf:
         """Plot 2D del percorso: parole visitate (e target se c'e'), ridotte
         in 2D via PCA."""
         from sklearn.decomposition import PCA
+
         parole_path = [self.start] + [mossa[2] for mossa in self.mosse]
         if self.target is not None:
             tutte = parole_path + [self.target]
         else:
             tutte = parole_path
         if len(tutte) < 2:
-            display(HTML(
-                '<div style="color:#888;font-family:sans-serif;">'
-                'Almeno una mossa serve per disegnare il percorso.'
-                '</div>'
-            ))
+            display(
+                HTML(
+                    '<div style="color:#888;font-family:sans-serif;">'
+                    "Almeno una mossa serve per disegnare il percorso."
+                    "</div>"
+                )
+            )
             return
         vecs = np.array([vettore(p) for p in tutte])
         pca = PCA(n_components=2).fit(vecs)
@@ -316,32 +414,45 @@ class WordGolf:
 
         fig = go.Figure()
         # Path
-        fig.add_trace(go.Scatter(
-            x=path_xy[:, 0], y=path_xy[:, 1],
-            mode="lines+markers+text",
-            text=parole_path,
-            textposition="top center",
-            line=dict(color="#3498db", width=2),
-            marker=dict(size=10, color="#3498db"),
-            name="il tuo cammino",
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=path_xy[:, 0],
+                y=path_xy[:, 1],
+                mode="lines+markers+text",
+                text=parole_path,
+                textposition="top center",
+                line=dict(color="#3498db", width=2),
+                marker=dict(size=10, color="#3498db"),
+                name="il tuo cammino",
+            )
+        )
         # Target (se presente)
         if target_xy is not None:
-            fig.add_trace(go.Scatter(
-                x=[target_xy[0]], y=[target_xy[1]],
-                mode="markers+text",
-                text=[f"🎯 {self.target}"],
-                textposition="top center",
-                marker=dict(size=18, color="#d62728", symbol="star"),
-                name="target",
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=[target_xy[0]],
+                    y=[target_xy[1]],
+                    mode="markers+text",
+                    text=[f"🎯 {self.target}"],
+                    textposition="top center",
+                    marker=dict(size=18, color="#d62728", symbol="star"),
+                    name="target",
+                )
+            )
         # Frecce tra step consecutivi
         for i in range(len(parole_path) - 1):
             fig.add_annotation(
-                x=path_xy[i + 1, 0], y=path_xy[i + 1, 1],
-                ax=path_xy[i, 0], ay=path_xy[i, 1],
-                xref="x", yref="y", axref="x", ayref="y",
-                showarrow=True, arrowhead=2, arrowsize=1.4,
+                x=path_xy[i + 1, 0],
+                y=path_xy[i + 1, 1],
+                ax=path_xy[i, 0],
+                ay=path_xy[i, 1],
+                xref="x",
+                yref="y",
+                axref="x",
+                ayref="y",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1.4,
                 arrowcolor="#3498db",
             )
         if self.target is not None:
@@ -351,13 +462,13 @@ class WordGolf:
             )
         else:
             titolo = (
-                f"Esplorazione libera da {self.start} "
-                f"({len(self.mosse)} mosse)"
+                f"Esplorazione libera da {self.start} " f"({len(self.mosse)} mosse)"
             )
         fig.update_layout(
             title=titolo,
             template="plotly_white",
-            width=750, height=550,
+            width=750,
+            height=550,
             xaxis=dict(title="PCA 1"),
             yaxis=dict(title="PCA 2"),
         )
@@ -369,7 +480,8 @@ class WordGolf:
         if self.vinto:
             self._html_msg(
                 "Hai già vinto! Per giocare un altro round crea un nuovo "
-                "<code>WordGolf(...)</code>.", colore="#888"
+                "<code>WordGolf(...)</code>.",
+                colore="#888",
             )
             return
         # Vietato usare start o target come operatore: sarebbe banale.
@@ -451,7 +563,11 @@ class WordGolf:
                 "ultimo_topk": top_words,
                 "timestamp": win_ts,
                 "dettaglio": [
-                    f"{s}{op}->{r}" for s, op, r, _ in self.mosse
+                    # Iniziamo con l'operatore (lettera) invece che col segno:
+                    # se inizia con +/- Google Sheets prova a interpretarlo
+                    # come formula e mostra #ERROR! nella cella.
+                    f"{op}({s})->{r}"
+                    for s, op, r, _ in self.mosse
                 ],
             }
             _RECORD.append(record)
@@ -462,7 +578,8 @@ class WordGolf:
             badge_dash = (
                 ' <span style="background:#2c662d;color:white;padding:2px 8px;'
                 'border-radius:10px;font-size:11px;">→ dashboard</span>'
-                if _get_dashboard_url() else ""
+                if _get_dashboard_url()
+                else ""
             )
             self._html_msg(
                 f"🎉 <b>VINTO!</b> '{self.target}' è nei top-{_TOP_K_VITTORIA} "
@@ -482,12 +599,13 @@ class WordGolf:
             )
             if self._target_v is not None:
                 # In modalita' sfida aggiungiamo la distanza dal target
-                sim_target = float(np.dot(
-                    vettore(nuova_parola) / (
-                        np.linalg.norm(vettore(nuova_parola)) + 1e-9
-                    ),
-                    self._target_v / np.linalg.norm(self._target_v),
-                ))
+                sim_target = float(
+                    np.dot(
+                        vettore(nuova_parola)
+                        / (np.linalg.norm(vettore(nuova_parola)) + 1e-9),
+                        self._target_v / np.linalg.norm(self._target_v),
+                    )
+                )
                 base_msg += (
                     f"<br><small>Distanza dal target (cosine sim): "
                     f"{sim_target:.3f} — più alta = più vicino</small>"
@@ -519,22 +637,25 @@ class WordGolf:
             segno, op, ris, top5 = mossa
             # Evidenzia il target se presente nei top-5 (solo modalita' sfida)
             top5_html = ", ".join(
-                f'<b style="color:#2c662d;">{w}</b>'
-                if (self.target is not None and w == self.target) else w
+                (
+                    f'<b style="color:#2c662d;">{w}</b>'
+                    if (self.target is not None and w == self.target)
+                    else w
+                )
                 for w in top5
             )
             righe.append(
-                f'<tr>'
+                f"<tr>"
                 f'<td style="padding:2px 8px;text-align:right;">{i}</td>'
                 f'<td style="padding:2px 8px;font-family:monospace;">{cur}</td>'
                 f'<td style="padding:2px 8px;text-align:center;">{segno}</td>'
                 f'<td style="padding:2px 8px;font-family:monospace;">{op}</td>'
                 f'<td style="padding:2px 8px;text-align:center;">→</td>'
                 f'<td style="padding:2px 8px;font-family:monospace;">'
-                f'<b>{ris}</b></td>'
+                f"<b>{ris}</b></td>"
                 f'<td style="padding:2px 8px;font-family:monospace;'
                 f'font-size:11px;color:#666;">top-5: {top5_html}</td>'
-                f'</tr>'
+                f"</tr>"
             )
             cur = ris
         tabella = (
@@ -542,56 +663,62 @@ class WordGolf:
             f'<thead><tr style="border-bottom:1px solid #999;">'
             f'<th style="padding:2px 8px;">#</th>'
             f'<th style="padding:2px 8px;">da</th>'
-            f'<th></th><th>op</th><th></th><th>a</th>'
+            f"<th></th><th>op</th><th></th><th>a</th>"
             f'<th style="padding:2px 8px;text-align:left;">vicini</th>'
-            f'</tr></thead>'
+            f"</tr></thead>"
             f'<tbody>{"".join(righe) or "<tr><td colspan=7><i>nessuna mossa ancora</i></td></tr>"}</tbody>'
-            f'</table>'
+            f"</table>"
         )
         if self._target_v is not None:
             v_cur = vettore(self.parola_corrente)
-            sim_target = float(np.dot(
-                v_cur / (np.linalg.norm(v_cur) + 1e-9),
-                self._target_v / np.linalg.norm(self._target_v),
-            ))
+            sim_target = float(
+                np.dot(
+                    v_cur / (np.linalg.norm(v_cur) + 1e-9),
+                    self._target_v / np.linalg.norm(self._target_v),
+                )
+            )
             header = (
-                f'<div><b>{self.squadra}</b> — '
-                f'{self.start} → 🎯 {self.target}</div>'
-                f'<div>Mosse fatte: {len(self.mosse)}. Parola attuale: '
-                f'<code>{self.parola_corrente}</code>. '
-                f'Sim. con target: {sim_target:.3f}</div>'
+                f"<div><b>{self.squadra}</b> — "
+                f"{self.start} → 🎯 {self.target}</div>"
+                f"<div>Mosse fatte: {len(self.mosse)}. Parola attuale: "
+                f"<code>{self.parola_corrente}</code>. "
+                f"Sim. con target: {sim_target:.3f}</div>"
             )
         else:
             header = (
-                f'<div>🧪 <b>Esplorazione libera</b> partita da '
-                f'<code>{self.start}</code></div>'
-                f'<div>Mosse fatte: {len(self.mosse)}. Parola attuale: '
-                f'<code>{self.parola_corrente}</code>.</div>'
+                f"<div>🧪 <b>Esplorazione libera</b> partita da "
+                f"<code>{self.start}</code></div>"
+                f"<div>Mosse fatte: {len(self.mosse)}. Parola attuale: "
+                f"<code>{self.parola_corrente}</code>.</div>"
             )
         html = (
             f'<div style="font-family:sans-serif;">'
-            f'{header}'
+            f"{header}"
             f'<div style="margin-top:6px;">{tabella}</div>'
-            f'</div>'
+            f"</div>"
         )
         display(HTML(html))
 
     def _html_msg(self, msg: str, colore: str = "#333", sfondo: str = "#f5f5f5"):
-        display(HTML(
-            f'<div style="font-family:sans-serif;color:{colore};'
-            f'background:{sfondo};padding:8px 12px;border-radius:4px;'
-            f'margin:4px 0;">{msg}</div>'
-        ))
+        display(
+            HTML(
+                f'<div style="font-family:sans-serif;color:{colore};'
+                f"background:{sfondo};padding:8px 12px;border-radius:4px;"
+                f'margin:4px 0;">{msg}</div>'
+            )
+        )
 
 
 def classifica():
     """Stampa la classifica di tutti i record di WordGolf giocati in questo notebook."""
     if not _RECORD:
-        display(HTML(
-            '<div style="font-family:sans-serif;color:#888;">'
-            'Nessuna partita vinta ancora. Quando una squadra vince un round, '
-            'compare qui automaticamente.</div>'
-        ))
+        display(
+            HTML(
+                '<div style="font-family:sans-serif;color:#888;">'
+                "Nessuna partita vinta ancora. Quando una squadra vince un round, "
+                "compare qui automaticamente.</div>"
+            )
+        )
         return
     # Raggruppa per (start, target), poi ordina per mosse asc
     da_target: Dict[Tuple[str, str], List[Dict]] = {}
@@ -609,13 +736,13 @@ def classifica():
                 f'<tr><td style="padding:2px 10px;">{medaglia}</td>'
                 f'<td style="padding:2px 10px;"><b>{r["squadra"]}</b></td>'
                 f'<td style="padding:2px 10px;font-family:monospace;">{r["mosse"]} mosse</td>'
-                f'</tr>'
+                f"</tr>"
             )
         tabella = (
             f'<table style="border-collapse:collapse;font-size:13px;margin-bottom:10px;">'
             f'<thead><tr style="border-bottom:1px solid #999;">'
             f'<th colspan=3 style="padding:3px 10px;text-align:left;">'
-            f'{s} → {t}</th></tr></thead>'
+            f"{s} → {t}</th></tr></thead>"
             f'<tbody>{"".join(righe)}</tbody></table>'
         )
         sezioni.append(tabella)
@@ -623,6 +750,6 @@ def classifica():
         f'<div style="font-family:sans-serif;">'
         f'<h3 style="margin-top:0;">🏆 Classifica Word Golf</h3>'
         f'{"".join(sezioni)}'
-        f'</div>'
+        f"</div>"
     )
     display(HTML(html))

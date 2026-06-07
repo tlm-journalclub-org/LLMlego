@@ -10,6 +10,18 @@ _COLORI = [
     "#D4BAFF", "#FFBAF0", "#C9C9C9", "#FFC4A3", "#A3E4D7",
 ]
 
+# Lo spazio iniziale del token (BPE attacca lo spazio alla parola che segue)
+# va segnato visivamente, perche' nei BPE moderni "ciao" e " ciao" sono
+# token diversi con ID diversi. Lo mostriamo in grigio chiaro: visibile
+# ma non invadente.
+_SPAZIO_MARKER = '<span style="color:#c5c5c5;">·</span>'
+_NEWLINE_MARKER = '<span style="color:#c5c5c5;">↵</span>'
+
+
+def _visibile(p: str) -> str:
+    """Sostituisce caratteri whitespace con marker grigi (in HTML)."""
+    return p.replace(" ", _SPAZIO_MARKER).replace("\n", _NEWLINE_MARKER)
+
 
 def _get_encoder():
     global _enc
@@ -33,7 +45,7 @@ def mostra_token(testo: str):
     for i, p in enumerate(pezzi):
         colore = _COLORI[i % len(_COLORI)]
         # Sostituisco gli spazi con un placeholder visibile
-        p_visibile = p.replace(" ", "·").replace("\n", "↵")
+        p_visibile = _visibile(p)
         spans.append(
             f'<span style="background:{colore};padding:3px 5px;'
             f'border-radius:4px;margin:1px;font-family:monospace;'
@@ -45,7 +57,7 @@ def mostra_token(testo: str):
     righe_tabella = []
     for i, (id_, p) in enumerate(zip(ids, pezzi)):
         colore = _COLORI[i % len(_COLORI)]
-        p_vis = p.replace(" ", "·").replace("\n", "↵")
+        p_vis = _visibile(p)
         righe_tabella.append(
             f'<tr>'
             f'<td style="padding:3px 8px;text-align:center;">{i+1}</td>'
@@ -66,7 +78,8 @@ def mostra_token(testo: str):
         f'<div style="font-family:sans-serif;">'
         f'<div style="margin-bottom:6px;"><b>Testo:</b> "{testo}"</div>'
         f'<div style="margin-bottom:6px;"><b>{len(ids)} token</b> '
-        f'(il punto · indica uno spazio):</div>'
+        f'(<span style="color:#c5c5c5;">·</span> = spazio incluso nel '
+        f'token):</div>'
         f'<div>{riga_pezzi}</div>'
         f'{tabella}'
         f'</div>'

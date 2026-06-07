@@ -1,13 +1,15 @@
-CONTEXT.md
-sentence-model/
-distilbert-multilingual-cased/
-.claude
+# Materiali admin che vivono in un repo privato separato (LLMlego-admin)
+dashboard/
+presentation/
+
+# Modelli pesanti (scaricati da setup_colab.py)
 *.kv
 *.kv.vectors.npy
-proposta_scuole_superiori.docx
-03_attention.ipynb
+distilbert-multilingual-cased/
+sentence-model/
+
+# Sistema/dev
+.DS_Store
+.claude
 __pycache__/
 *.pyc
-build_notebook.py
-.gitignore
-.DS_Store
