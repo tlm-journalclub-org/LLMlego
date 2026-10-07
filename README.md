@@ -1,5 +1,7 @@
 # 🧱 LLM Lego — versione scuole superiori
 
+[![Apri in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tlm-journalclub-org/LLMlego/blob/scuole/laboratorio.ipynb)
+
 Branch `scuole`: adattamento del lab del journal club per una **lezione di 2 ore**
 in classe di liceo (target principale: scientifico, 3°–5°).
 
